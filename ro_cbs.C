@@ -71,14 +71,13 @@ using namespace RooFit;   // THIS LOADS  ROOFIT  RooFit RooFit   RooFit   RooFit
 //  n peaks,   positions, pn/p0/p1/p2  etc...
 //  v budoucnu by to chtelo 2step - bg per partes; bgfix+ccc 
 //===================================================================
-RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstring){
-
-
+RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *pad=NULL){
   int i;
   FILE* log;
   log=fopen("ro_cbsfit.log","a");
   if (log!=NULL){ 
-    fprintf( log, "\n##########################################################\n%s", "" );
+    fprintf( log, "\n##########################################################\n%s", "" );   
+    fprintf( log, "%s\n", h2->GetTitle() );
   }
 
   TVirtualPad *oldpad=NULL;
@@ -95,6 +94,9 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
  printf("oldpad == %lld\n", (Long64_t)oldpad );
 
 
+ if (pad!=NULL){
+   pad->cd();
+ }else{
   TCanvas *chi;
   chi=(TCanvas*)gROOT->GetListOfCanvases()->FindObject("c_roofit");
   if (chi!=NULL){
@@ -103,6 +105,8 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
     chi=new TCanvas("c_roofit","roofit check result window");
     chi->cd();
   }
+ }//pad !=NULL
+
 
   if (npeaks>NMAX){ printf("TOO MANY PEAKS%s\n",""); return NULL;}
 
@@ -119,8 +123,17 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
    * 2/  however - bin can be whatever
    *
    */
-  double min=h2->GetXaxis()->GetFirst(),
-    max=h2->GetXaxis()->GetLast(),
+  // there was some struggle here.
+  //from verticals- use getxaxis-getxmin
+  //from cint - use getfirst??
+  //============================== GetXmin is real minimum
+  //GetFirst gets 1st bin - 0 if not zoom
+  double 
+    //    min=h2->GetXaxis()->GetXmin(),
+    //    max=h2->GetXaxis()->GetXmax(),
+
+    min=h2->GetBinCenter(h2->GetXaxis()->GetFirst()),
+    max=h2->GetBinCenter(h2->GetXaxis()->GetLast()),
     smin=(max-min)/1000,
     smax=(max-min),
     amin=h2->Integral( h2->GetXaxis()->FindBin(min), 
@@ -146,8 +159,14 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
   }
 
   printf("FROM ====== %f DOWNTO  %f \n" ,max, min );
-  for (i=0;i<npeaks;i++){
-    pk[i]=xa[i];
+  if (xa!=NULL){
+    for (i=0;i<npeaks;i++){
+      pk[i]=xa[i];
+    }
+  }else{
+    for (i=0;i<npeaks;i++){
+      pk[i]=min+ (i+1)*(max-min)/(npeaks+1);
+    }
   }//--------------------
 
 
@@ -155,7 +174,7 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
   for (i=0;i<npeaks;i++){
     //    pk[i]=1.0*(i+1)/(1+npeaks)*(max-min) +min;
     //    si[i]=4.3; 
-    pk[i]=xa[i];
+    //    pk[i]=xa[i];
     si[i]=smax/4  /2; //    /2 EMPIRICAL 1peak
     ar[i]=1.0*(amax+amin)/npeaks/2.  /3.; //     /3 EMPIRICAL 1peak AREA  
     al[i]=1.3;
@@ -265,7 +284,7 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
 
 
   // -------- fsx   0== FIX to sigm1;    1==free sigma
-  fs2.setVal( 1.0 );  
+  fs2.setVal( 0.0 );  // 
   fs3.setVal( 1.0 );  
   fs4.setVal( 1.0 );  
   fs5.setVal( 1.0 );  
@@ -411,6 +430,7 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
  char vars[10];
 
 
+ double sigmalog,dsigmalog;
  if (log!=NULL){ 
     fprintf( log, "----------------------------------------------------------\n%s", "" );
     //    fprintf( log, "pk%02d %9.3f   %9.3f  %9.3f\n", i,
@@ -422,11 +442,11 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
       RooRealVar* t1=(RooRealVar*)fitresult->floatParsFinal().find( varm ) ;
       RooRealVar* t2=(RooRealVar*)fitresult->floatParsFinal().find( vara ) ;
       RooRealVar* t3=(RooRealVar*)fitresult->floatParsFinal().find( vars ) ;
-
-      fprintf(log,"pk%02d %9.3f   %9.3f  %9.3f /%9.3f   %9.3f  %9.3f \n", i+1, 
-	      t1->getVal() ,  t2->getVal() ,  t3->getVal() , 
-	      t1->getError(), t2->getError(), t3->getError());
-      
+      if (t3!=NULL){ sigmalog=t3->getVal();dsigmalog=t3->getError();}
+    fprintf(log,"pk%02d %9.3f   %9.3f  %9.3f /%9.3f   %9.3f  %9.3f \n", i+1, 
+	      t1->getVal() ,  t2->getVal() ,  sigmalog , 
+	      t1->getError(), t2->getError(), dsigmalog );
+            
     }// for all npeaks
  }// if log..............................................................................
 
@@ -487,7 +507,8 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
 
 
  gPad->Modified();gPad->Update();
- fitresult->floatParsFinal().Print("s") ;
+
+ fitresult->floatParsFinal().Print("s") ;//crashes when fixed sigma2??
 
  printf("sigma  = =  %f chan\n",   sigm1.getVal()    );
 
@@ -503,8 +524,8 @@ RooFitResult* ro_cbs( TH1F * h2,     int npeaks, double* xa , const char* bgstri
    }
  } 
 
- return NULL ;
- // return fitresult ;
+ // return NULL ;
+  return fitresult ;
 // return sigm1.getVal() ;
 
 }//==================================ro_cbs ======
