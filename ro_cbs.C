@@ -148,14 +148,16 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
 
 
   if (log!=NULL){ 
-    fprintf( log, "min=%f\n", min );
-    fprintf( log, "max=%f\n", max );
+    fprintf( log, "%s\n", "automatic variable guess" );
+    fprintf( log, "xmin=%f\n", min );
+    fprintf( log, "xmax=%f\n", max );
 
-    fprintf( log, "smin=%f\n", smin );
-    fprintf( log, "smax=%f\n", smax );
+    fprintf( log, "sigmin=%f\n", smin );
+    fprintf( log, "sigmax=%f\n", smax );
 
-    fprintf( log, "amin=%f\n", amin );
-    fprintf( log, "amax=%f\n", amax );
+    fprintf( log, "areamin=%f\n", amin );
+    fprintf( log, "areamax=%f\n", amax );
+    fprintf( log, "%s\n", "initial peak position, area, sigma:" );
   }
 
   printf("FROM ====== %f DOWNTO  %f \n" ,max, min );
@@ -179,7 +181,7 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
     ar[i]=1.0*(amax+amin)/npeaks/2.  /3.; //     /3 EMPIRICAL 1peak AREA  
     al[i]=1.3;
     if (log!=NULL){ 
-      fprintf( log, "pk%02d %9.3f   %9.3f  %9.3f \n", 
+      fprintf( log, "%02d %9.3f   %9.3f  %9.3f \n", 
 	       i+1, 
 	       pk[i], ar[i], si[i] );
     }
@@ -432,7 +434,7 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
 
  double sigmalog,dsigmalog;
  if (log!=NULL){ 
-    fprintf( log, "----------------------------------------------------------\n%s", "" );
+    fprintf( log, "#---------------------------------------------------------FIT:-\n%s", "" );
     //    fprintf( log, "pk%02d %9.3f   %9.3f  %9.3f\n", i,
     //	     mean1.getVal(),area1.getVal(),sigm1.getVal() );
     for (i=0;i<npeaks;i++){
@@ -443,7 +445,7 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
       RooRealVar* t2=(RooRealVar*)fitresult->floatParsFinal().find( vara ) ;
       RooRealVar* t3=(RooRealVar*)fitresult->floatParsFinal().find( vars ) ;
       if (t3!=NULL){ sigmalog=t3->getVal();dsigmalog=t3->getError();}
-    fprintf(log,"pk%02d %9.3f   %9.3f  %9.3f /%9.3f   %9.3f  %9.3f \n", i+1, 
+    fprintf(log,"%02d %9.3f   %9.3f  %9.3f /%9.3f   %9.3f  %9.3f \n", i+1, 
 	      t1->getVal() ,  t2->getVal() ,  sigmalog , 
 	      t1->getError(), t2->getError(), dsigmalog );
             
@@ -459,52 +461,54 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
 
  emodelV.plotOn(xframe, LineColor(kRed),   DrawOption("l0z") );
 
- emodelV.plotOn(xframe, Components(ecb1),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb1),LineColor(kGreen),LineStyle(kDashed) );
 
  emodelV.plotOn(xframe, Components(ebkg),LineColor(kYellow),LineStyle(kSolid)  );
 
 
  emodelV.plotOn(xframe, Components(RooArgSet(ecb1,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
+
+
  if (npeaks>1){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb2,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb2),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb2),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>2){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb3,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb3),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb3),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>3){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb4,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb4),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb4),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>4){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb5,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb5),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb5),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>5){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb6,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb6),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb6),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>6){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb7,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb7),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb7),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>7){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb8,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb8),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb8),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>8){
  emodelV.plotOn(xframe, Components(RooArgSet(ecb9,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecb9),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecb9),LineColor(kGreen),LineStyle(kDashed) );
  }
  if (npeaks>9){
  emodelV.plotOn(xframe, Components(RooArgSet(ecba,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
- emodelV.plotOn(xframe, Components(ecba),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ecba),LineColor(kGreen),LineStyle(kDashed) );
  }
  // ...
 
  xframe->Draw();
-
+ gPad->SetLogy( oldpad->GetLogy() );
 
  gPad->Modified();gPad->Update();
 
@@ -513,7 +517,7 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
  printf("sigma  = =  %f chan\n",   sigm1.getVal()    );
 
  //last things
- if (log!=NULL){ fclose( log ); } 
+ if (log != NULL){ fclose( log ); } 
 
  // printf("oldpad == %lld\n", (Long64_t)oldpad );
 
