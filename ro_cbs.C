@@ -55,6 +55,8 @@
 #include "RooCustomizer.h"
 #include "RooFitResult.h"
 
+#include "TGraphErrors.h"   // MARKER
+
 // to get canvas list
 #include "TROOT.h"
 
@@ -67,17 +69,171 @@ using namespace RooFit;   // THIS LOADS  ROOFIT  RooFit RooFit   RooFit   RooFit
 //using namespace RooFit;   // THIS LOADS  ROOFIT  RooFit RooFit   RooFit   RooFit  
 
 
+
+//============================================================== ONE CBS
+// i hope that a1 is alpha1, not the area....
+int one_cbs(double x1,  double sig, double a1, double n1,  
+	    double limlow, double limhi  , FILE* logg=NULL ){
+
+ printf("......................one cbs %8.3f ............\n", x1); 
+
+ FILE* log;
+ if (logg==NULL){   log=fopen("ro_cbsfit.log1","a"); }else{ log=logg;}
+
+ //  if (log!=NULL){ 
+ //  fprintf( log, "\n############ %8.3f ###################################\n", x1 );
+ //  }
+
+  TVirtualPad *oldpad=NULL;
+  TCanvas *c; 
+  if (gPad!=NULL){  oldpad=gPad; }else{ oldpad=NULL;}
+  c=(TCanvas*)gROOT->GetListOfCanvases()->FindObject("onecbs");
+  if (c==NULL){    c=new TCanvas("onecbs");  }
+  c->cd();
+
+  printf("#  x=%.3f  s=%.3f a1=%.3f n1=%.3f :  %.3f .. %.3f\n",
+	x1, sig, a1, n1, limlow,  limhi );
+
+  fprintf(log,"#   %.3f sigma=%.3f  alpha1=%.3f  n1=%.3f    limits:  %.3f .. %.3f\n",
+	x1, sig, a1, n1, limlow,  limhi );
+ 
+
+
+  // in parameters  TH1F *h2;
+  double pk[1];
+  double si[1];
+  //  double ar[1];
+  double al[1];
+  // shadows  double n1;
+
+  double  xmin=limlow-(limhi-limlow); // no, i take from 0
+  xmin=0.;
+  double  xmax=limhi;
+  double  smin=sig;
+  double  smax=sig;
+  //  double  amin=area;
+  //  double  amax=area;
+  
+  double    almin=0.2;
+  double    almax=100.;
+  double    nmin=1.0;
+  double    nmax=100.;
+  
+  pk[0]=x1;
+
+  si[0]=sig;
+  //    ar[0]=area;
+  al[0]=a1;
+  //---    n1=5.1;
+  
+  printf("x=%5.3f L(%f .. %f)  sigma=%5.3f   alpha=%5.3f   n1= %5.3f\n", 
+	   pk[0], xmin,xmax,si[0],  al[0], n1 );
+  //================ MAIN variable 1D ==============
+  RooRealVar     x("x",    "x",   xmin, xmax);
+  RooRealVar mean1("mean1", "mean_", pk[0], xmin,xmax);
+  RooRealVar sigm1("sigm1", "sigma", si[0], smin, smax);
+  //  RooRealVar area1("area1", "area_", ar[0], amin, amax);
+  //=================== only one instance ===================
+  RooRealVar alph1("alph1", "alph1",  al[0], almin, almax );
+  RooRealVar ncbs1("n1", "n1",  n1, nmin, nmax );
+
+  //  printf("................. cb1 :\n%s",""); 
+    RooAbsPdf  *cb1   = new  RooCBShape("cb1","CBS", x, mean1, sigm1,alph1,ncbs1);
+  //  RooCBShape cb1("cb1","CBS", x, mean1, sigm1,alph1,ncbs1);
+  //  RooGaussian cb1("cb1","CBS", x, mean1, sigm1 );
+  //  RooExtendPdf ecb1("ecb1","ECBS", cb1, area1 );
+
+
+  RooPlot* xframe = x.frame(); 
+  //  printf(".............................verbose frame:\n%s","");  xframe->Print("v"); 
+  //  printf("................. cb1 plot:\n%s",""); 
+  cb1->plotOn(xframe,  LineColor(kBlack) );
+
+  // gPad->SetLogy( oldpad->GetLogy() );
+  // gPad->SetLogy( 0 );
+  xframe->Draw();
+
+ gPad->Modified();gPad->Update();
+
+RooAbsReal* integ = cb1->createIntegral (x ); 
+double IntegralValue = integ->getVal(); 
+//cout << IntegralValue << endl; 
+
+//=================range 1 
+ x.setRange("fitted", limlow, limhi ) ;  
+ cb1->plotOn(xframe,  LineColor(kRed), Range("fitted")   );
+ RooAbsReal* igx_sig = cb1->createIntegral(x, Range("fitted") ) ;
+ double rangeint=igx_sig->getVal();
+
+//=================range 2
+ x.setRange("unseen", 0, limlow ) ;  
+ cb1->plotOn(xframe,  LineColor(kGreen), Range("unseen")   );
+ RooAbsReal* unseen = cb1->createIntegral(x, Range("unseen") ) ;
+ double unseenint=unseen->getVal();
+
+ printf("#   Total= %f  range= %f  unseen= %f (SUM= %f)  AREAcorrection= %f\n\n", 
+	IntegralValue, rangeint , unseenint, rangeint+unseenint,
+	IntegralValue/rangeint   );
+ fprintf(log, "#   Total= %f  range= %f  unseen= %f (SUM= %f)  AREAcorrection= %f\n", 
+	IntegralValue, rangeint , unseenint, rangeint+unseenint,
+	IntegralValue/rangeint   );
+ c->cd();
+ xframe->Draw();
+ 
+// //NOT  fitresult->plotOn( xframe , DrawOption("F")  );
+ // emodelV.plotOn( xframe );
+ // // xframe->Draw();
+ // emodelV.Print();
+ // emodelV.plotOn(xframe, LineColor(kRed),   DrawOption("l0z") );
+ // // emodelV.plotOn(xframe, Components(ecb1),LineColor(kGreen),LineStyle(kDashed) );
+ // emodelV.plotOn(xframe, Components(ebkg),LineColor(kYellow),LineStyle(kSolid)  );
+ // emodelV.plotOn(xframe, Components(RooArgSet(ecb1,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
+ // if (npeaks>1){
+ // emodelV.plotOn(xframe, Components(RooArgSet(ecb2,ebkg)),LineColor(kBlue),LineStyle(kDashed) );
+ // // emodelV.plotOn(xframe, Components(ecb2),LineColor(kGreen),LineStyle(kDashed) );
+ // }
+
+
+ if (oldpad!=NULL){ 
+   //   printf("ODLPAD = %lld\n", (Long64_t) oldpad);
+   //   if (oldpad!=gPad){
+   oldpad->GetCanvas()->cd();
+   //   }
+ }
+ if (logg==NULL){  if (log!=NULL){fclose(log);}  }
+ return 0;
+}//==================================ro_cbs ======
+
+//=============================================================== END OF ONE ==================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //  npeak  ,   double *x,  bg
 //  n peaks,   positions, pn/p0/p1/p2  etc...
 //  v budoucnu by to chtelo 2step - bg per partes; bgfix+ccc 
-//===================================================================
+//===========================================================================================+START MAIN====
+//===========================================================================================+START MAIN====
+//===========================================================================================+START MAIN====
 RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *pad=NULL){
   int i;
   FILE* log;
+  char finame[180]="";
   log=fopen("ro_cbsfit.log","a");
   if (log!=NULL){ 
     fprintf( log, "\n##########################################################\n%s", "" );   
-    fprintf( log, "%s\n", h2->GetTitle() );
+    if (gFile!=NULL){sprintf( finame,"%s", gFile->GetName() );}
+    fprintf( log, "%s\t%s\n", h2->GetTitle(), finame );
   }
 
   TVirtualPad *oldpad=NULL;
@@ -108,10 +264,23 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
  }//pad !=NULL
 
 
-  if (npeaks>NMAX){ printf("TOO MANY PEAKS%s\n",""); return NULL;}
-
-  // in parameters  TH1F *h2;
   double pk[NMAX];
+  pk[0]=0.0;pk[1]=0.0;
+
+  if (npeaks>NMAX){ printf("TOO MANY PEAKS%s\n",""); return NULL;}
+  if (npeaks<1){
+    printf("ZERO PEAKS ... TRYING TO SEARCH IN gROOT->GetListOfSpecials() for MARKS\n%s","");
+    
+    TGraphErrors*g=(TGraphErrors*)gROOT->GetListOfSpecials()->FindObject("MARKS");
+    double y;
+    npeaks=g->GetN();
+    if (npeaks>NMAX){ npeaks=NMAX;}
+    for (int ii=0;ii<npeaks;ii++){
+      g->GetPoint( ii, pk[ii], y);
+    }
+  }
+  
+  // in parameters  TH1F *h2;
   double si[NMAX];
   double ar[NMAX];
   double al[NMAX];
@@ -157,19 +326,21 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
 
     fprintf( log, "areamin=%f\n", amin );
     fprintf( log, "areamax=%f\n", amax );
-    fprintf( log, "%s\n", "initial peak position, area, sigma:" );
+    fprintf( log, "%s\n", "initial peak position, area, sigma, lpha:" );
   }
 
   printf("FROM ====== %f DOWNTO  %f \n" ,max, min );
-  if (xa!=NULL){
-    for (i=0;i<npeaks;i++){
-      pk[i]=xa[i];
-    }
-  }else{
-    for (i=0;i<npeaks;i++){
-      pk[i]=min+ (i+1)*(max-min)/(npeaks+1);
-    }
-  }//--------------------
+  if (pk[0]==0. && pk[1]==0.){
+    if (xa!=NULL){
+      for (i=0;i<npeaks;i++){
+	pk[i]=xa[i];
+      }
+    }else{
+      for (i=0;i<npeaks;i++){
+	pk[i]=min+ (i+1)*(max-min)/(npeaks+1);
+      }
+    }//--------------------
+  }//============== ok were or not   set by MARKS
 
 
 
@@ -179,11 +350,11 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
     //    pk[i]=xa[i];
     si[i]=smax/4  /2; //    /2 EMPIRICAL 1peak
     ar[i]=1.0*(amax+amin)/npeaks/2.  /3.; //     /3 EMPIRICAL 1peak AREA  
-    al[i]=1.3;
+    al[i]=1.99;
     if (log!=NULL){ 
-      fprintf( log, "%02d %9.3f   %9.3f  %9.3f \n", 
+      fprintf( log, "%02d %9.3f   %9.3f  %9.3f  %9.3f  \n", 
 	       i+1, 
-	       pk[i], ar[i], si[i] );
+	       pk[i], ar[i], si[i], al[i] );
     }
   }//---------for all npeaks --------
   n1=5.1;
@@ -254,6 +425,8 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
   RooRealVar sigme("sigme", "sigma", si[13], smin, smax);
   RooRealVar sigmf("sigmf", "sigma", si[14], smin, smax);
 
+  //=================================  FREE FIX SIGMA =======================================
+
   RooRealVar    fs2("fs2","fs2", 0.0 ); // factor sigma = 1==free or 0==fix
   RooRealVar    fs3("fs3","fs3", 0.0 ); // factor sigma = 1==free or 0==fix
   RooRealVar    fs4("fs4","fs4", 0.0 ); // factor sigma = 1==free or 0==fix
@@ -287,19 +460,19 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
 
   // -------- fsx   0== FIX to sigm1;    1==free sigma
   fs2.setVal( 0.0 );  // 
-  fs3.setVal( 1.0 );  
-  fs4.setVal( 1.0 );  
-  fs5.setVal( 1.0 );  
-  fs6.setVal( 1.0 );  
-  fs7.setVal( 1.0 );  
-  fs8.setVal( 1.0 );  
-  fs9.setVal( 1.0 );  
-  fsa.setVal( 1.0 );  
-  fsb.setVal( 1.0 );  
-  fsc.setVal( 1.0 );  
-  fsd.setVal( 1.0 );  
-  fse.setVal( 1.0 );  
-  fsf.setVal( 1.0 );  
+  fs3.setVal( 0.0 );  
+  fs4.setVal( 0.0 );  
+  fs5.setVal( 0.0 );  
+  fs6.setVal( 0.0 );  
+  fs7.setVal( 0.0 );  
+  fs8.setVal( 0.0 );  
+  fs9.setVal( 0.0 );  
+  fsa.setVal( 0.0 );  
+  fsb.setVal( 0.0 );  
+  fsc.setVal( 0.0 );  
+  fsd.setVal( 0.0 );  
+  fse.setVal( 0.0 );  
+  fsf.setVal( 0.0 );     //  0.0  all fix to sigma1
   
   fs2.setConstant( kTRUE );  
   fs3.setConstant( kTRUE );  
@@ -332,6 +505,106 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
   if (fsf.getVal()==0.0){sigmf.setConstant( kTRUE );}
 
 
+  //=================================  FREE FIX ALPHA =======================================
+  // some fix...  almin=1.3;  almax=2.3;
+  RooRealVar alph1("alph1", "alph1",  al[0], almin, almax );
+  RooRealVar alph2("alph2", "alph2",  al[1], almin, almax );
+  RooRealVar alph3("alph3", "alph3",  al[2], almin, almax );
+  RooRealVar alph4("alph4", "alph4",  al[3], almin, almax );
+  RooRealVar alph5("alph5", "alph5",  al[4], almin, almax );
+  RooRealVar alph6("alph6", "alph6",  al[5], almin, almax );
+  RooRealVar alph7("alph7", "alph7",  al[6], almin, almax );
+  RooRealVar alph8("alph8", "alph8",  al[7], almin, almax );
+  RooRealVar alph9("alph9", "alph9",  al[8], almin, almax );
+  RooRealVar alpha("alpha", "alpha",  al[9], almin, almax );
+  RooRealVar alphb("alphb", "alphb",  al[10], almin, almax );
+  RooRealVar alphc("alphc", "alphc",  al[11], almin, almax );
+  RooRealVar alphd("alphd", "alphd",  al[12], almin, almax );
+  RooRealVar alphe("alphe", "alphe",  al[13], almin, almax );
+  RooRealVar alphf("alphf", "alphf",  al[14], almin, almax );
+
+
+  RooRealVar    fa2("fa2","fa2", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fa3("fa3","fa3", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fa4("fa4","fa4", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fa5("fa5","fa5", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fa6("fa6","fa6", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fa7("fa7","fa7", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fa8("fa8","fa8", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fa9("fa9","fa9", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    faa("faa","faa", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fab("fab","fab", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fac("fac","fac", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fad("fad","fad", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    fae("fae","fae", 0.0 ); // factor alpha = 1==free or 0==fix
+  RooRealVar    faf("faf","faf", 0.0 ); // factor alpha = 1==free or 0==fix
+
+  RooFormulaVar falph2( "falph2", " fa2*alph2 + (1.0-fa2)*alph1" , RooArgSet(alph1,alph2,fa2) );
+  RooFormulaVar falph3( "falph3", " fa3*alph3 + (1.0-fa3)*alph1" , RooArgSet(alph1,alph3,fa3) );
+  RooFormulaVar falph4( "falph4", " fa4*alph4 + (1.0-fa4)*alph1" , RooArgSet(alph1,alph4,fa4) );
+  RooFormulaVar falph5( "falph5", " fa5*alph5 + (1.0-fa5)*alph1" , RooArgSet(alph1,alph5,fa5) );
+  RooFormulaVar falph6( "falph6", " fa6*alph6 + (1.0-fa6)*alph1" , RooArgSet(alph1,alph6,fa6) );
+  RooFormulaVar falph7( "falph7", " fa7*alph7 + (1.0-fa7)*alph1" , RooArgSet(alph1,alph7,fa7) );
+  RooFormulaVar falph8( "falph8", " fa8*alph8 + (1.0-fa8)*alph1" , RooArgSet(alph1,alph8,fa8) );
+  RooFormulaVar falph9( "falph9", " fa9*alph9 + (1.0-fa9)*alph1" , RooArgSet(alph1,alph9,fa9) );
+  RooFormulaVar falpha( "falpha", " faa*alpha + (1.0-faa)*alph1" , RooArgSet(alph1,alpha,faa) );
+  RooFormulaVar falphb( "falphb", " fab*alphb + (1.0-fab)*alph1" , RooArgSet(alph1,alphb,fab) );
+  RooFormulaVar falphc( "falphc", " fac*alphc + (1.0-fac)*alph1" , RooArgSet(alph1,alphc,fac) );
+  RooFormulaVar falphd( "falphd", " fad*alphd + (1.0-fad)*alph1" , RooArgSet(alph1,alphd,fad) );
+  RooFormulaVar falphe( "falphe", " fae*alphe + (1.0-fae)*alph1" , RooArgSet(alph1,alphe,fae) );
+  RooFormulaVar falphf( "falphf", " faf*alphf + (1.0-faf)*alph1" , RooArgSet(alph1,alphf,faf) );
+
+
+  // -------- fsx   0== FIX to alph1;    1==free alpha
+  fa2.setVal( 0.0 );  // 
+  fa3.setVal( 0.0 );  
+  fa4.setVal( 0.0 );  
+  fa5.setVal( 0.0 );  
+  fa6.setVal( 0.0 );  
+  fa7.setVal( 0.0 );  
+  fa8.setVal( 0.0 );  
+  fa9.setVal( 0.0 );  
+  faa.setVal( 0.0 );  
+  fab.setVal( 0.0 );  
+  fac.setVal( 0.0 );  
+  fad.setVal( 0.0 );  
+  fae.setVal( 0.0 );  
+  faf.setVal( 0.0 );     //  0.0  all fix to sigma1
+  
+  fa2.setConstant( kTRUE );  
+  fa3.setConstant( kTRUE );  
+  fa4.setConstant( kTRUE );  
+  fa5.setConstant( kTRUE );  
+  fa6.setConstant( kTRUE );  
+  fa7.setConstant( kTRUE );  
+  fa8.setConstant( kTRUE );  
+  fa9.setConstant( kTRUE );  
+  faa.setConstant( kTRUE );  
+  fab.setConstant( kTRUE );  
+  fac.setConstant( kTRUE );  
+  fad.setConstant( kTRUE );  
+  fae.setConstant( kTRUE );  
+  faf.setConstant( kTRUE );  
+
+  if (fa2.getVal()==0.0){alph2.setConstant( kTRUE );}
+  if (fa3.getVal()==0.0){alph3.setConstant( kTRUE );}
+  if (fa4.getVal()==0.0){alph4.setConstant( kTRUE );}
+  if (fa5.getVal()==0.0){alph5.setConstant( kTRUE );}
+  if (fa6.getVal()==0.0){alph6.setConstant( kTRUE );}
+  if (fa7.getVal()==0.0){alph7.setConstant( kTRUE );}
+  if (fa8.getVal()==0.0){alph8.setConstant( kTRUE );}
+  if (fa9.getVal()==0.0){alph9.setConstant( kTRUE );}
+  if (faa.getVal()==0.0){alpha.setConstant( kTRUE );}
+  if (fab.getVal()==0.0){alphb.setConstant( kTRUE );}
+  if (fac.getVal()==0.0){alphc.setConstant( kTRUE );}
+  if (fad.getVal()==0.0){alphd.setConstant( kTRUE );}
+  if (fae.getVal()==0.0){alphe.setConstant( kTRUE );}
+  if (faf.getVal()==0.0){alphf.setConstant( kTRUE );}
+
+
+
+  //======================================== END OF ALPHA ========
+
   // extra thing that goes to RootSet
   RooRealVar area1("area1", "area_", ar[0], amin, amax);
   RooRealVar area2("area2", "area_", ar[1], amin, amax);
@@ -350,26 +623,24 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
   RooRealVar areaf("areaf", "area_", ar[14], amin, amax);
 
 
-
   //=================== only one instance ===================
-  RooRealVar alph1("alph1", "alph1",  al[0], almin, almax );
-  RooRealVar ncbs1("n1", "n1",  n1, nmin, nmax );
+  RooRealVar ncbs1("n1", "n1",  n1, nmin, nmax );    //  this exponenet is all the same
 
-  RooCBShape cb1("cb1","CBS", x,mean1, sigm1,alph1,ncbs1);
-  RooCBShape cb2("cb2","CBS", x,mean2,fsigm2,alph1,ncbs1);
-  RooCBShape cb3("cb3","CBS", x,mean3,fsigm3,alph1,ncbs1);
-  RooCBShape cb4("cb4","CBS", x,mean4,fsigm4,alph1,ncbs1);
-  RooCBShape cb5("cb5","CBS", x,mean5,fsigm5,alph1,ncbs1);
-  RooCBShape cb6("cb6","CBS", x,mean6,fsigm6,alph1,ncbs1);
-  RooCBShape cb7("cb7","CBS", x,mean7,fsigm7,alph1,ncbs1);
-  RooCBShape cb8("cb8","CBS", x,mean8,fsigm8,alph1,ncbs1);
-  RooCBShape cb9("cb9","CBS", x,mean9,fsigm9,alph1,ncbs1);
-  RooCBShape cba("cba","CBS", x,meana,fsigma,alph1,ncbs1);
-  RooCBShape cbb("cbb","CBS", x,meanb,fsigmb,alph1,ncbs1);
-  RooCBShape cbc("cbc","CBS", x,meanc,fsigmc,alph1,ncbs1);
-  RooCBShape cbd("cbd","CBS", x,meand,fsigmd,alph1,ncbs1);
-  RooCBShape cbe("cbe","CBS", x,meane,fsigme,alph1,ncbs1);
-  RooCBShape cbf("cbf","CBS", x,meanf,fsigmf,alph1,ncbs1);
+  RooCBShape cb1("cb1","CBS", x,mean1, sigm1, alph1,ncbs1);
+  RooCBShape cb2("cb2","CBS", x,mean2,fsigm2,falph2,ncbs1);
+  RooCBShape cb3("cb3","CBS", x,mean3,fsigm3,falph3,ncbs1);
+  RooCBShape cb4("cb4","CBS", x,mean4,fsigm4,falph4,ncbs1);
+  RooCBShape cb5("cb5","CBS", x,mean5,fsigm5,falph5,ncbs1);
+  RooCBShape cb6("cb6","CBS", x,mean6,fsigm6,falph6,ncbs1);
+  RooCBShape cb7("cb7","CBS", x,mean7,fsigm7,falph7,ncbs1);
+  RooCBShape cb8("cb8","CBS", x,mean8,fsigm8,falph8,ncbs1);
+  RooCBShape cb9("cb9","CBS", x,mean9,fsigm9,falph9,ncbs1);
+  RooCBShape cba("cba","CBS", x,meana,fsigma,falpha,ncbs1);
+  RooCBShape cbb("cbb","CBS", x,meanb,fsigmb,falphb,ncbs1);
+  RooCBShape cbc("cbc","CBS", x,meanc,fsigmc,falphc,ncbs1);
+  RooCBShape cbd("cbd","CBS", x,meand,fsigmd,falphd,ncbs1);
+  RooCBShape cbe("cbe","CBS", x,meane,fsigme,falphe,ncbs1);
+  RooCBShape cbf("cbf","CBS", x,meanf,fsigmf,falphf,ncbs1);
 
   RooExtendPdf ecb1("ecb1","ECBS", cb1, area1 );
   RooExtendPdf ecb2("ecb2","ECBS", cb2, area2 );
@@ -427,31 +698,6 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
  fitresult->Print("v") ;
 
 
- char varm[10];
- char vara[10];
- char vars[10];
-
-
- double sigmalog,dsigmalog;
- if (log!=NULL){ 
-    fprintf( log, "#---------------------------------------------------------FIT:-\n%s", "" );
-    //    fprintf( log, "pk%02d %9.3f   %9.3f  %9.3f\n", i,
-    //	     mean1.getVal(),area1.getVal(),sigm1.getVal() );
-    for (i=0;i<npeaks;i++){
-      sprintf(varm, "mean%x", i+1 );
-      sprintf(vara, "area%x", i+1 );
-      sprintf(vars, "sigm%x", i+1 );
-      RooRealVar* t1=(RooRealVar*)fitresult->floatParsFinal().find( varm ) ;
-      RooRealVar* t2=(RooRealVar*)fitresult->floatParsFinal().find( vara ) ;
-      RooRealVar* t3=(RooRealVar*)fitresult->floatParsFinal().find( vars ) ;
-      if (t3!=NULL){ sigmalog=t3->getVal();dsigmalog=t3->getError();}
-    fprintf(log,"%02d %9.3f   %9.3f  %9.3f /%9.3f   %9.3f  %9.3f \n", i+1, 
-	      t1->getVal() ,  t2->getVal() ,  sigmalog , 
-	      t1->getError(), t2->getError(), dsigmalog );
-            
-    }// for all npeaks
- }// if log..............................................................................
-
 
  //NOT  fitresult->plotOn( xframe , DrawOption("F")  );
  emodelV.plotOn( xframe );
@@ -508,16 +754,13 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
  // ...
 
  xframe->Draw();
- gPad->SetLogy( oldpad->GetLogy() );
-
+ if (oldpad!=NULL){ gPad->SetLogy( oldpad->GetLogy() );}
  gPad->Modified();gPad->Update();
-
  fitresult->floatParsFinal().Print("s") ;//crashes when fixed sigma2??
-
  printf("sigma  = =  %f chan\n",   sigm1.getVal()    );
 
  //last things
- if (log != NULL){ fclose( log ); } 
+ /// lastr if (log != NULL){ fclose( log ); } 
 
  // printf("oldpad == %lld\n", (Long64_t)oldpad );
 
@@ -528,9 +771,71 @@ RooFitResult* ro_cbs(TH1F *h2,int npeaks,double* xa,const char* bgstring,TPad *p
    }
  } 
 
- // return NULL ;
+
+
+
+
+
+
+
+ char varm[10];
+ char vara[10];
+ char vars[10];
+
+ char varalph1[10];
+ char varn1[10];
+
+ printf("going to LOG \n%s", "");
+ double sigmalog=5.,  dsigmalog,  alphalog=2.0 ;
+ if (log!=NULL){ 
+    fprintf( log, "#---------------------------------------------------------FIT:-\n%s", "" );
+    //    fprintf( log, "pk%02d %9.3f   %9.3f  %9.3f\n", i,
+    //	     mean1.getVal(),area1.getVal(),sigm1.getVal() );
+    for (i=0;i<npeaks;i++){
+ printf("going to PEAK %d \n", i+1  );
+      sprintf(varm, "mean%x", i+1 );
+      sprintf(vara, "area%x", i+1 );
+      sprintf(vars, "sigm%x", i+1 );
+
+      sprintf(varalph1, "alph%x", i+1 ); // alph1
+      sprintf(varn1, "n%x", 1 );    // n1
+
+      RooRealVar* t1=(RooRealVar*)fitresult->floatParsFinal().find( varm ) ;
+      RooRealVar* t2=(RooRealVar*)fitresult->floatParsFinal().find( vara ) ;
+      RooRealVar* t3=(RooRealVar*)fitresult->floatParsFinal().find( vars ) ;
+      // sigma1  sigmai
+      if (t3!=NULL){ sigmalog=t3->getVal(); dsigmalog=t3->getError();}
+
+      RooRealVar* ta1=(RooRealVar*)fitresult->floatParsFinal().find( varalph1 ) ;
+      // alpha1  alphai
+      if (ta1!=NULL){ alphalog=ta1->getVal(); }
+
+      RooRealVar* tn1=(RooRealVar*)fitresult->floatParsFinal().find( varn1 ) ;
+
+      printf("going to log peak %d \n", i+1  );
+      fprintf(log,"%02d %9.3f   %9.3f  %9.3f %9.3f   %9.3f  %9.3f \n", i+1, 
+	      t1->getVal() , t1->getError(),  t2->getVal() , t2->getError(),
+	      sigmalog , dsigmalog );
+      //	      t1->getVal() ,  t2->getVal() ,  sigmalog , 
+      //	      t1->getError(), t2->getError(), dsigmalog );
+    //====================now i can add info from one_cbs===============
+      //    if (i<2){
+      printf("going to one cbs %d \n", i+1  );
+      one_cbs(  t1->getVal(), sigmalog,  alphalog ,  
+              tn1->getVal() ,
+		min,max,  log);
+    //             t1->getVal() + 3*t3->getVal()  ); //I try +3sigma
+      //    }
+    //             t1->getVal() - 3*t3->getVal() , 
+    //==============done========================
+    }// for all npeaks
+ }// if log..............................................................................
+
+  if (log!=NULL){fclose(log);}
+
+
+
   return fitresult ;
-// return sigm1.getVal() ;
 
 }//==================================ro_cbs ======
 
